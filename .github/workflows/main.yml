@@ -1,30 +1,70 @@
-name: Advanced DevOps Pipeline
+name: Validate HTML syntax & deploy
 
 on:
   push:
     branches: [ "main" ]
+  workflow_dispatch:   # allow manual trigger
+
+# Required for GitHub Pages deployment
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
-  pipeline:
+  validate-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 1. Checkout code
-        uses: actions/checkout@v3
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
 
-      - name: 2. Build
-        run: |
-          echo "🔨 Building application..."
-          sleep 2
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
-      - name: 3. Test
-        run: |
-          echo "🧪 Running tests..."
-          sleep 2
-          echo "✅ Tests passed!"
+      # 1. HTML syntax validation (strict – will fail on errors)
+      - name: 🔍 Install HTML validator
+        run: npm install -g html-validate
 
-      - name: 4. Deploy (Simulated)
+      - name: ✅ Run HTML syntax validation
+        run: html-validate "**/*.html" --config .htmlvalidate.json
+
+      # 2. Additional structure test (no false positives)
+      - name: 🧪 Check required tags
         run: |
-          echo "🚀 Deploying application..."
-          sleep 2
-          echo "🌐 Application deployed successfully!"
+          for file in $(find . -name "*.html"); do
+            echo "Checking $file"
+            if ! grep -q "<!DOCTYPE html>" "$file"; then
+              echo "❌ Missing DOCTYPE in $file"
+              exit 1
+            fi
+            if ! grep -q "<title>" "$file"; then
+              echo "❌ Missing <title> in $file"
+              exit 1
+            fi
+          done
+          echo "✅ All HTML files have DOCTYPE and <title>"
+
+      # 3. Optional: link checker (internal only, don't fail on external)
+      - name: 🔗 Check internal links
+        run: |
+          npx linkinator ./ --recurse --skip "https?://([^/]|$)" --verbosity error
+        continue-on-error: true   # external links may be flaky, but syntax is already enforced
+
+      # 4. Prepare for GitHub Pages
+      - name: 🌐 Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: 📂 Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: 🚀 Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
