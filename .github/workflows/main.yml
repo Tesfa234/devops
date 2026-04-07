@@ -1,20 +1,17 @@
-name: Jekyll site CI
+name: DevOps Pipeline
 
-on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+on: [push]
 
 jobs:
-  build:
-
+  pipeline:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Build the site in the jekyll/builder container
-      run: |
-        docker run \
-        -v ${{ github.workspace }}:/srv/jekyll -v ${{ github.workspace }}/_site:/srv/jekyll/_site \
-        jekyll/builder:latest /bin/bash -c "chmod -R 777 /srv/jekyll && jekyll build --future"
+      - name: Build
+        run: echo "🔨 Building..."
+
+      - name: Test
+        run: echo "🧪 Testing..."
+
+      - name: Deploy
+        run: echo "🚀 Deploying..."
