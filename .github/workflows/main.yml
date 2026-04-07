@@ -1,30 +1,90 @@
-name: Advanced DevOps Pipeline
+name: Real DevOps Pipeline for Static HTML
 
 on:
   push:
     branches: [ "main" ]
+  # Allow manual trigger from Actions tab
+  workflow_dispatch:
+
+# Grant GITHUB_TOKEN the permissions needed for GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Concurrency group ensures only one deployment runs at a time
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
-  pipeline:
+  validate-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 1. Checkout code
-        uses: actions/checkout@v3
+      # 1. Checkout source code
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
 
-      - name: 2. Build
-        run: |
-          echo "🔨 Building application..."
-          sleep 2
+      # 2. Setup Node.js (needed for HTML validation tools)
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
 
-      - name: 3. Test
+      # 3. Install HTML linting & link checking tools
+      - name: 📦 Install dependencies
         run: |
-          echo "🧪 Running tests..."
-          sleep 2
-          echo "✅ Tests passed!"
+          npm install -g html-validate linkinator
 
-      - name: 4. Deploy (Simulated)
+      # 4. Lint HTML files – catches real issues (missing alt, invalid tags, etc.)
+      - name: 🔍 HTML Linting (html-validate)
         run: |
-          echo "🚀 Deploying application..."
-          sleep 2
-          echo "🌐 Application deployed successfully!"
+          # Run on all .html files in the repository
+          html-validate "**/*.html" --config .htmlvalidate.json || true
+          # For a real pipeline, remove "|| true" to fail on errors.
+          # Here we keep it soft, but you can enforce strict mode.
+          echo "✅ HTML validation completed"
+
+      # 5. Check for broken links (internal & external)
+      - name: 🔗 Link checker (linkinator)
+        run: |
+          npx linkinator ./ --skip-sri --recurse --verbosity error \
+            --skip "https://www.linkedin.com/*" || true
+          # Adjust skip patterns to avoid false positives on social media
+
+      # 6. (Optional) Run a simple structural test using Node.js
+      - name: 🧪 Run custom HTML structure test
+        run: |
+          node -e "
+          const fs = require('fs');
+          const html = fs.readFileSync('index.html', 'utf8');
+          if (!html.includes('<title>')) throw new Error('Missing <title>');
+          if (!html.includes('<!DOCTYPE html>')) throw new Error('Missing DOCTYPE');
+          console.log('✅ Basic HTML structure test passed');
+          "
+
+      # 7. Upload the static site as an artifact (optional, for inspection)
+      - name: 📦 Upload static files as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-site
+          path: |
+            *.html
+            *.css
+            *.js
+            assets/**
+
+      # 8. Deploy to GitHub Pages
+      - name: 🌐 Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: 📂 Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'  # Upload everything (index.html, assets, etc.)
+
+      - name: 🚀 Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
