@@ -1,17 +1,30 @@
-name: DevOps Pipeline
+name: Advanced DevOps Pipeline
 
-on: [push]
+on:
+  push:
+    branches: [ "main" ]
 
 jobs:
   pipeline:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Build
-        run: echo "🔨 Building..."
+      - name: 1. Checkout code
+        uses: actions/checkout@v3
 
-      - name: Test
-        run: echo "🧪 Testing..."
+      - name: 2. Build
+        run: |
+          echo "🔨 Building application..."
+          sleep 2
 
-      - name: Deploy
-        run: echo "🚀 Deploying..."
+      - name: 3. Test
+        run: |
+          echo "🧪 Running tests..."
+          sleep 2
+          echo "✅ Tests passed!"
+
+      - name: 4. Deploy (Simulated)
+        run: |
+          echo "🚀 Deploying application..."
+          sleep 2
+          echo "🌐 Application deployed successfully!"
